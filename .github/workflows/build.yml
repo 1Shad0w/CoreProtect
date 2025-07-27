@@ -1,43 +1,52 @@
-name: Build
+name: Maven Package and Release
+
 on:
-  push:
-    branches:
-      - master
-  pull_request:
-    types: [opened, synchronize, reopened]
+  release:
+    types: [created]  # Se ejecuta cuando se crea un release en GitHub
+
 jobs:
   build:
-    name: Build
     runs-on: ubuntu-latest
+    permissions:
+      contents: write  # Necesario para crear releases y hacer push de archivos
+      packages: write  # Necesario para publicar en GitHub Packages
+
     steps:
-      # Paso 1: Checkout del código
-      - uses: actions/checkout@v4
-        with:
-          fetch-depth: 0  # Desactivar clonaciones superficiales para obtener el historial completo
+    # Paso 1: Checkout del código
+    - uses: actions/checkout@v4
 
-      # Paso 2: Configurar JDK 21 (o el que estés usando)
-      - name: Set up JDK 21
-        uses: actions/setup-java@v4
-        with:
-          java-version: '21'
-          distribution: 'temurin'
+    # Paso 2: Configurar JDK 21
+    - name: Set up JDK 21
+      uses: actions/setup-java@v4
+      with:
+        java-version: '21'
+        distribution: 'temurin'
+        server-id: github  # Este valor depende de tu configuración en pom.xml
+        settings-path: ${{ github.workspace }}  # Ubicación de settings.xml
 
-      # Paso 3: Cache de dependencias de Maven
-      - name: Cache Maven packages
-        uses: actions/cache@v4
-        with:
-          path: ~/.m2
-          key: ${{ runner.os }}-m2-${{ hashFiles('**/pom.xml') }}
-          restore-keys: ${{ runner.os }}-m2
+    # Paso 3: Construir el proyecto con Maven
+    - name: Build with Maven
+      run: mvn -B package --file pom.xml
 
-      # Paso 4: Construcción del proyecto
-      - name: Build
-        run: mvn clean package -DskipTests  # Asegúrate de que el .jar sea generado en target/
+    # Paso 4: Mover el archivo .jar a la carpeta build/
+    - name: Move JAR to build folder
+      run: |
+        mkdir -p build  # Crea la carpeta build si no existe
+        mv target/*.jar build/  # Mueve el archivo .jar generado al directorio build/
 
-      # Paso 5: Subir el archivo JAR como Release en GitHub
-      - name: Upload JAR as a GitHub Release
-        uses: softprops/action-gh-release@v1
-        with:
-          files: target/*.jar  # Asegúrate de que el archivo generado esté en 'target/'
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}  # GitHub Token para autenticar la acción
+    # Paso 5: Hacer commit de la carpeta build/ con el archivo .jar
+    - name: Commit the JAR file to the repository
+      run: |
+        git config --global user.name "GitHub Actions"
+        git config --global user.email "actions@github.com"
+        git add build/*.jar
+        git commit -m "Add JAR file for release ${{ github.event.release.tag_name }}"
+        git push origin ${{ github.ref }}
+
+    # Paso 6: Subir el archivo .jar como Release en GitHub
+    - name: Upload JAR to GitHub Release
+      uses: softprops/action-gh-release@v1
+      with:
+        files: build/*.jar  # Subir desde la carpeta build/
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}  # Usamos el token de GitHub para la autenticación
