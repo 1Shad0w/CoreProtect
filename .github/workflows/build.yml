@@ -1,52 +1,36 @@
-name: Maven Package and Release
+name: Build and Deploy
 
 on:
-  release:
-    types: [created]  # Se ejecuta cuando se crea un release en GitHub
+  push:
+    branches:
+      - master
+      - main
+  workflow_dispatch:  # Esto permite que el workflow se ejecute manualmente
 
 jobs:
   build:
     runs-on: ubuntu-latest
-    permissions:
-      contents: write  # Necesario para crear releases y hacer push de archivos
-      packages: write  # Necesario para publicar en GitHub Packages
 
     steps:
-    # Paso 1: Checkout del código
-    - uses: actions/checkout@v4
+    - name: Checkout code
+      uses: actions/checkout@v4
 
-    # Paso 2: Configurar JDK 21
     - name: Set up JDK 21
       uses: actions/setup-java@v4
       with:
         java-version: '21'
         distribution: 'temurin'
-        server-id: github  # Este valor depende de tu configuración en pom.xml
-        settings-path: ${{ github.workspace }}  # Ubicación de settings.xml
 
-    # Paso 3: Construir el proyecto con Maven
     - name: Build with Maven
-      run: mvn -B package --file pom.xml
+      run: mvn clean package
 
-    # Paso 4: Mover el archivo .jar a la carpeta build/
     - name: Move JAR to build folder
-      run: |
-        mkdir -p build  # Crea la carpeta build si no existe
-        mv target/*.jar build/  # Mueve el archivo .jar generado al directorio build/
+      run: mv target/*.jar build/
 
-    # Paso 5: Hacer commit de la carpeta build/ con el archivo .jar
-    - name: Commit the JAR file to the repository
+    - name: Commit and Push JAR to GitHub
       run: |
         git config --global user.name "GitHub Actions"
         git config --global user.email "actions@github.com"
         git add build/*.jar
-        git commit -m "Add JAR file for release ${{ github.event.release.name }}"
-        git push origin ${{ github.ref }}
-
-    # Paso 6: Subir el archivo .jar como Release en GitHub
-    - name: Upload JAR to GitHub Release
-      uses: softprops/action-gh-release@v1
-      with:
-        files: build/*.jar  # Subir desde la carpeta build/
-      env:
-        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}  # Usamos el token de GitHub para la autenticación
+        git commit -m "Add JAR file to build folder"
+        git push origin main
