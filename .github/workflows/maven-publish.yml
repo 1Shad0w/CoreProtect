@@ -34,10 +34,25 @@ jobs:
     - name: Build with Maven
       run: mvn -B package --file pom.xml
 
-    # Paso 5: Subir el archivo .jar como Release en GitHub
+    # Paso 5: Mover el archivo .jar a la carpeta releases/
+    - name: Move JAR to releases folder
+      run: |
+        mkdir -p releases
+        mv target/*.jar releases/
+
+    # Paso 6: Hacer commit de la carpeta releases/ con el archivo .jar
+    - name: Commit the JAR file to the repository
+      run: |
+        git config --global user.name "GitHub Actions"
+        git config --global user.email "actions@github.com"
+        git add releases/*.jar
+        git commit -m "Add JAR file for release ${{ github.event.release.tag_name }}"
+        git push origin ${{ github.ref }}
+
+    # Paso 7: Subir el archivo .jar como Release en GitHub
     - name: Upload JAR to GitHub Release
       uses: softprops/action-gh-release@v1
       with:
-        files: target/*.jar  # Asegúrate de que el archivo .jar se genere en target/
+        files: releases/*.jar  # Subir desde la carpeta releases/
       env:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}  # Usamos el token de GitHub para la autenticación
