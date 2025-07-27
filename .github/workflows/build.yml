@@ -25,7 +25,7 @@ jobs:
       run: mvn clean package
 
     - name: Move JAR to build folder
-      run: mv target/*.jar build/
+      run: mv target/*.jar releases/
 
     - name: Commit and Push JAR to GitHub
       run: |
